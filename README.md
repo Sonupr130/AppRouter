@@ -272,11 +272,25 @@ public protocol TabType: Hashable, CaseIterable, Identifiable, Sendable {
 
 ## Examples
 
+### Type Aliases for Cleaner Syntax
+
+To avoid verbose generic syntax throughout your app, create a type alias:
+
+```swift
+// Define once in your app
+typealias AppRouter = Router<AppTab, Destination, Sheet>
+typealias AppSimpleRouter = SimpleRouter<Destination, Sheet>
+
+// Then use the cleaner syntax everywhere
+@Environment(AppRouter.self) private var router
+@State private var router = AppRouter(initialTab: .home)
+```
+
 ### Navigate Programmatically
 
 ```swift
 struct HomeView: View {
-    @Environment(Router<AppTab, Destination, Sheet>.self) private var router
+    @Environment(AppRouter.self) private var router
     
     var body: some View {
         VStack {

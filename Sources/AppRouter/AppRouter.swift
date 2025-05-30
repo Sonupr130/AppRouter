@@ -42,9 +42,14 @@
 /// }
 /// ```
 ///
-/// 3. Create and use the router:
+/// 3. Create a type alias for cleaner syntax:
 /// ```swift
-/// @State private var router = Router<AppTab, Destination, Sheet>(initialTab: .home)
+/// typealias AppRouter = Router<AppTab, Destination, Sheet>
+/// ```
+///
+/// 4. Create and use the router:
+/// ```swift
+/// @State private var router = AppRouter(initialTab: .home)
 ///
 /// var body: some View {
 ///     TabView(selection: $router.selectedTab) {
@@ -60,6 +65,20 @@
 ///     }
 ///     .sheet(item: $router.presentedSheet) { sheet in
 ///         SheetView(sheet: sheet)
+///     }
+///     .environment(router)
+/// }
+/// ```
+///
+/// 5. Use the router in child views:
+/// ```swift
+/// struct ContentView: View {
+///     @Environment(AppRouter.self) private var router
+///     
+///     var body: some View {
+///         Button("Navigate") {
+///             router.navigateTo(.detail("example"))
+///         }
 ///     }
 /// }
 /// ```
