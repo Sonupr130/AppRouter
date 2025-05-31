@@ -1,7 +1,14 @@
 import SwiftUI
 
 /// A type that can serve as a navigation destination.
-public protocol DestinationType: Hashable {}
+public protocol DestinationType: Hashable {
+    /// Creates a destination from a URL path component and query parameters
+    /// - Parameters:
+    ///   - path: The URL path component
+    ///   - parameters: Query parameters from the URL
+    /// - Returns: A destination instance if the path matches, nil otherwise
+    static func from(path: String, parameters: [String: String]) -> Self?
+}
 
 /// A type that can be presented as a sheet.
 public protocol SheetType: Hashable, Identifiable {}

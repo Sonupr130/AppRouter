@@ -10,6 +10,7 @@ A generic, reusable navigation router for SwiftUI applications. Supports both si
 - 🔄 **SwiftUI Integration** - Uses `@Observable` for reactive state updates
 - 🧵 **Thread Safe** - `@MainActor` implementation ensures UI safety
 - 📱 **iOS 17+ Ready** - Built for modern SwiftUI patterns
+- 🔗 **URL Deep Linking** - Navigate via URLs with automatic parameter parsing
 
 ## Installation
 
@@ -228,6 +229,7 @@ public final class SimpleRouter<Destination: DestinationType, Sheet: SheetType>
 - `popToRoot()` - Clear navigation stack
 - `presentSheet(_:)` - Present a sheet
 - `dismissSheet()` - Dismiss current sheet
+- `navigate(to:)` - Navigate using a URL or URL string
 
 ### Router
 
@@ -249,12 +251,16 @@ public final class Router<Tab: TabType, Destination: DestinationType, Sheet: She
 - `popToRoot(for:)` - Clear navigation stack for tab
 - `presentSheet(_:)` - Present a sheet
 - `dismissSheet()` - Dismiss current sheet
+- `navigate(to:)` - Navigate using a URL or URL string
 
 ### Protocols
 
 #### DestinationType  
 ```swift
-public protocol DestinationType: Hashable {}
+public protocol DestinationType: Hashable {
+    /// Creates a destination from a URL path component and query parameters
+    static func from(path: String, parameters: [String: String]) -> Self?
+}
 ```
 
 #### SheetType
@@ -269,6 +275,223 @@ public protocol TabType: Hashable, CaseIterable, Identifiable, Sendable {
 }
 ```
 *Only needed for tab-based navigation*
+
+## URL Deep Linking
+
+AppRouter supports URL-based deep linking, allowing you to navigate to specific screens in your app using URLs. This works with both `Router` and `SimpleRouter`.
+
+### Setting Up Deep Linking
+
+#### 1. Implement URL Parsing in Your Destination Type
+
+```swift
+enum Destination: DestinationType {
+    case detail(id: String)
+    case list
+    case profile(userId: String)
+    
+    // Required for URL deep linking
+    static func from(path: String, parameters: [String: String]) -> Destination? {
+        switch path {
+        case "detail":
+            let id = parameters["id"] ?? "default"
+            return .detail(id: id)
+        case "list":
+            return .list
+        case "profile":
+            let userId = parameters["userId"] ?? "unknown"
+            return .profile(userId: userId)
+        default:
+            return nil
+        }
+    }
+}
+```
+
+#### 2. Handle Incoming URLs with SwiftUI's .openURL
+
+```swift
+struct ContentView: View {
+    @State private var router = SimpleRouter<Destination, Sheet>()
+    
+    var body: some View {
+        NavigationStack(path: $router.path) {
+            HomeView()
+                .navigationDestination(for: Destination.self) { destination in
+                    destinationView(for: destination)
+                }
+        }
+        .environment(router)
+        .onOpenURL { url in
+            // Handle deep links
+            router.navigate(to: url)
+        }
+    }
+}
+```
+
+#### 3. Configure Your App's URL Scheme
+
+Add your URL scheme to your app's `Info.plist`:
+
+```xml
+<key>CFBundleURLTypes</key>
+<array>
+    <dict>
+        <key>CFBundleURLName</key>
+        <string>myapp.deeplink</string>
+        <key>CFBundleURLSchemes</key>
+        <array>
+            <string>myapp</string>
+        </array>
+    </dict>
+</array>
+```
+
+### URL Format
+
+URLs follow this format: `scheme://destination1/destination2?param1=value1&param2=value2`
+
+#### Examples
+
+```swift
+// Navigate to a single destination
+"myapp://list"
+
+// Navigate to a destination with parameters
+"myapp://detail?id=123"
+
+// Navigate through multiple destinations (navigation stack)
+"myapp://list/detail?id=456"
+
+// Multiple destinations with mixed parameters
+"myapp://profile/detail?userId=john&id=post123"
+```
+
+### Using Deep Links Programmatically
+
+#### Create URLs for Sharing
+
+```swift
+// Using the URL helper extension
+let url = URL.deepLink(
+    scheme: "myapp",
+    destinations: [Destination.detail(id: "123")],
+    parameters: ["source": "share"]
+)
+
+// Share the URL
+if let url = url {
+    let activityVC = UIActivityViewController(activityItems: [url], applicationActivities: nil)
+    // Present activity controller
+}
+```
+
+#### Navigate Programmatically
+
+```swift
+struct HomeView: View {
+    @Environment(SimpleRouter<Destination, Sheet>.self) private var router
+    
+    var body: some View {
+        VStack {
+            Button("Deep Link to Detail") {
+                router.navigate(to: "myapp://detail?id=456")
+            }
+            
+            Button("Navigate with URL") {
+                let url = URL(string: "myapp://list/detail?id=789")!
+                router.navigate(to: url)
+            }
+        }
+    }
+}
+```
+
+### Tab-Based Apps
+
+For tab-based apps using `Router`, deep links navigate to the **currently selected tab**:
+
+```swift
+struct TabContentView: View {
+    @State private var router = Router<AppTab, Destination, Sheet>(initialTab: .home)
+    
+    var body: some View {
+        TabView(selection: $router.selectedTab) {
+            // ... tab content
+        }
+        .onOpenURL { url in
+            // This will navigate in the currently active tab
+            router.navigate(to: url)
+        }
+    }
+}
+```
+
+### Advanced URL Handling
+
+#### Custom URL Processing
+
+```swift
+// Handle URLs manually for custom logic
+@Environment(AppRouter.self) private var router
+
+func handleCustomURL(_ url: URL) {
+    // Add custom pre-processing
+    guard url.scheme == "myapp" else { return }
+    
+    // Log analytics
+    Analytics.track("deep_link_opened", parameters: ["url": url.absoluteString])
+    
+    // Navigate using the router
+    let success = router.navigate(to: url)
+    
+    if !success {
+        // Handle failed navigation
+        showErrorAlert("Invalid deep link")
+    }
+}
+```
+
+#### URL Validation
+
+```swift
+extension Destination {
+    static func from(path: String, parameters: [String: String]) -> Destination? {
+        switch path {
+        case "detail":
+            // Validate required parameters
+            guard let id = parameters["id"], !id.isEmpty else {
+                return nil
+            }
+            return .detail(id: id)
+        case "profile":
+            guard let userId = parameters["userId"], 
+                  userId.count >= 3 else {
+                return nil
+            }
+            return .profile(userId: userId)
+        default:
+            return nil
+        }
+    }
+}
+```
+
+### Testing Deep Links
+
+#### iOS Simulator
+```bash
+# Open deep link in simulator
+xcrun simctl openurl booted "myapp://detail?id=123"
+```
+
+#### Xcode Debugging
+1. Edit your scheme
+2. Go to "Run" → "Arguments" → "Arguments Passed On Launch"
+3. Add: `-FIRDebugEnabled`
+4. Go to "Options" → "URL Arguments"
+5. Add your test URL: `myapp://detail?id=test`
 
 ## Examples
 

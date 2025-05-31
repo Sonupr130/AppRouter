@@ -1,4 +1,5 @@
 import SwiftUI
+import Foundation
 
 /// A generic navigation router that manages tab-based navigation state with navigation stacks and sheet presentation.
 @Observable
@@ -80,5 +81,28 @@ public final class Router<Tab: TabType, Destination: DestinationType, Sheet: She
     /// Dismisses the currently presented sheet.
     public func dismissSheet() {
         presentedSheet = nil
+    }
+    
+    // MARK: - URL Routing Methods
+    
+    /// Navigates to a URL by parsing its components and routing accordingly
+    /// - Parameter url: The URL to navigate to
+    /// - Returns: True if the URL was successfully routed, false otherwise
+    @discardableResult
+    public func navigate(to url: URL) -> Bool {
+        return URLNavigationHelper.navigate(url: url) { destinations in
+            paths[selectedTab] = destinations
+        }
+    }
+    
+    /// Navigates to a URL string by parsing its components and routing accordingly
+    /// - Parameter urlString: The URL string to navigate to
+    /// - Returns: True if the URL was successfully routed, false otherwise
+    @discardableResult
+    public func navigate(to urlString: String) -> Bool {
+        guard let url = URL(string: urlString) else {
+            return false
+        }
+        return navigate(to: url)
     }
 }

@@ -1,4 +1,5 @@
 import SwiftUI
+import Foundation
 
 /// A simple navigation router for single-stack navigation with sheet presentation.
 /// Use this when you don't need tab-based navigation, just a single NavigationStack.
@@ -50,5 +51,28 @@ public final class SimpleRouter<Destination: DestinationType, Sheet: SheetType> 
     /// Dismisses the currently presented sheet
     public func dismissSheet() {
         presentedSheet = nil
+    }
+    
+    // MARK: - URL Routing Methods
+    
+    /// Navigates to a URL by parsing its components and routing accordingly
+    /// - Parameter url: The URL to navigate to
+    /// - Returns: True if the URL was successfully routed, false otherwise
+    @discardableResult
+    public func navigate(to url: URL) -> Bool {
+        return URLNavigationHelper.navigate(url: url) { destinations in
+            path = destinations
+        }
+    }
+    
+    /// Navigates to a URL string by parsing its components and routing accordingly
+    /// - Parameter urlString: The URL string to navigate to
+    /// - Returns: True if the URL was successfully routed, false otherwise
+    @discardableResult
+    public func navigate(to urlString: String) -> Bool {
+        guard let url = URL(string: urlString) else {
+            return false
+        }
+        return navigate(to: url)
     }
 }
