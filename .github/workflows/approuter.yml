@@ -1,0 +1,23 @@
+name: AppRouter
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build & Test AppRouter
+    runs-on: macos-latest
+    timeout-minutes: 50
+    steps:
+      - uses: actions/checkout@v4
+      - name: Select Xcode
+        run: sudo xcode-select -switch /Applications/Xcode_16.1.app
+      - name: Build & Test AppRouter
+        run: xcodebuild -scheme AppRouter -destination 'platform=iOS Simulator,name=iPhone 16' -configuration "Debug" build test
