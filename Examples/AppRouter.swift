@@ -16,7 +16,7 @@
 /// ```swift
 /// enum AppTab: String, TabType, CaseIterable {
 ///     case home, profile, settings
-///     
+///
 ///     var id: String { rawValue }
 ///     var icon: String {
 ///         switch self {
@@ -74,7 +74,7 @@
 /// ```swift
 /// struct ContentView: View {
 ///     @Environment(AppRouter.self) private var router
-///     
+///
 ///     var body: some View {
 ///         Button("Navigate") {
 ///             router.navigateTo(.detail("example"))

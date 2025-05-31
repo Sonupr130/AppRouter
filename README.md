@@ -11,6 +11,7 @@ A generic, reusable navigation router for SwiftUI applications. Supports both si
 - 🧵 **Thread Safe** - `@MainActor` implementation ensures UI safety
 - 📱 **iOS 17+ Ready** - Built for modern SwiftUI patterns
 - 🔗 **URL Deep Linking** - Navigate via URLs with automatic parameter parsing
+- 🛤️ **Contextual Routing** - Same path components create different destinations based on context (e.g., `/users/detail` vs `/posts/detail`)
 
 ## Installation
 
@@ -258,8 +259,8 @@ public final class Router<Tab: TabType, Destination: DestinationType, Sheet: She
 #### DestinationType  
 ```swift
 public protocol DestinationType: Hashable {
-    /// Creates a destination from a URL path component and query parameters
-    static func from(path: String, parameters: [String: String]) -> Self?
+    /// Creates a destination from a URL path component with full path context and query parameters
+    static func from(path: String, fullPath: [String], parameters: [String: String]) -> Self?
 }
 ```
 
@@ -289,18 +290,37 @@ enum Destination: DestinationType {
     case detail(id: String)
     case list
     case profile(userId: String)
+    case userDetail(id: String)     // Different from generic detail
+    case postDetail(id: String)     // Different from generic detail
     
-    // Required for URL deep linking
-    static func from(path: String, parameters: [String: String]) -> Destination? {
-        switch path {
-        case "detail":
+    // Required for URL deep linking with contextual routing support
+    static func from(path: String, fullPath: [String], parameters: [String: String]) -> Destination? {
+        // Find current position in the path for context
+        guard let currentIndex = fullPath.firstIndex(of: path) else {
+            return nil
+        }
+        
+        let previousComponent = currentIndex > 0 ? fullPath[currentIndex - 1] : nil
+        
+        switch (previousComponent, path) {
+        // Contextual routing - same path component, different destinations
+        case ("users", "detail"):
+            let id = parameters["id"] ?? "unknown"
+            return .userDetail(id: id)
+        case ("posts", "detail"):
+            let id = parameters["id"] ?? "unknown"
+            return .postDetail(id: id)
+        // Standard routing
+        case (_, "detail"):
             let id = parameters["id"] ?? "default"
             return .detail(id: id)
-        case "list":
+        case (_, "list"):
             return .list
-        case "profile":
+        case (_, "profile"):
             let userId = parameters["userId"] ?? "unknown"
             return .profile(userId: userId)
+        case (nil, "users"), (nil, "posts"):
+            return nil // These are path segments, not destinations
         default:
             return nil
         }
@@ -364,9 +384,27 @@ URLs follow this format: `scheme://destination1/destination2?param1=value1&param
 // Navigate through multiple destinations (navigation stack)
 "myapp://list/detail?id=456"
 
-// Multiple destinations with mixed parameters
-"myapp://profile/detail?userId=john&id=post123"
+// Contextual routing - same path, different destinations
+"myapp://users/detail?id=user123"  // → userDetail(id: "user123")
+"myapp://posts/detail?id=post456"  // → postDetail(id: "post456")
+"myapp://detail?id=generic789"     // → detail(id: "generic789")
+
+// Complex navigation with context
+"myapp://list/users/detail?id=john&tab=profile"
 ```
+
+### Contextual Routing
+
+AppRouter supports **contextual routing** where the same path component can create different destinations based on the preceding path. This mirrors web routing patterns where `/users/detail` and `/posts/detail` are different routes.
+
+```swift
+// Different destinations from the same "detail" path:
+"myapp://users/detail?id=123"  // Creates userDetail(id: "123")
+"myapp://posts/detail?id=456"  // Creates postDetail(id: "456") 
+"myapp://detail?id=789"        // Creates detail(id: "789")
+```
+
+This enables more natural URL structures that match REST API patterns and web conventions.
 
 ### Using Deep Links Programmatically
 
@@ -457,15 +495,21 @@ func handleCustomURL(_ url: URL) {
 
 ```swift
 extension Destination {
-    static func from(path: String, parameters: [String: String]) -> Destination? {
-        switch path {
-        case "detail":
-            // Validate required parameters
+    static func from(path: String, fullPath: [String], parameters: [String: String]) -> Destination? {
+        guard let currentIndex = fullPath.firstIndex(of: path) else {
+            return nil
+        }
+        
+        let previousComponent = currentIndex > 0 ? fullPath[currentIndex - 1] : nil
+        
+        switch (previousComponent, path) {
+        case ("users", "detail"):
+            // Validate required parameters for user detail
             guard let id = parameters["id"], !id.isEmpty else {
                 return nil
             }
-            return .detail(id: id)
-        case "profile":
+            return .userDetail(id: id)
+        case (_, "profile"):
             guard let userId = parameters["userId"], 
                   userId.count >= 3 else {
                 return nil
@@ -484,6 +528,10 @@ extension Destination {
 ```bash
 # Open deep link in simulator
 xcrun simctl openurl booted "myapp://detail?id=123"
+
+# Test contextual routing
+xcrun simctl openurl booted "myapp://users/detail?id=user123"
+xcrun simctl openurl booted "myapp://posts/detail?id=post456"
 ```
 
 #### Xcode Debugging
